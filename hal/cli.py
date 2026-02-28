@@ -372,17 +372,56 @@ def is_inspect_solver(agent_function: str, agent_dir: str) -> bool:
 
 
 def validate_model_pricing(model_name: str) -> None:
-    """Validate that model pricing information exists"""
+    """Ensure model pricing info exists for cost tracking.
+
+    HAL uses ``MODEL_PRICES_DICT`` to estimate evaluation cost from token usage.
+    For local / self-hosted models (e.g. OpenAI-compatible endpoints), pricing is
+    often unknown. In that case we warn and default pricing to $0 instead of
+    failing the run.
+
+    Set ``HAL_STRICT_MODEL_PRICING=1`` to restore the previous strict behavior.
+    """
+
     from .utils.weave_utils import MODEL_PRICES_DICT
 
-    # together_ai is not part of weave model name
-    model_name = model_name.replace("together_ai/", "")
+    # Some provider prefixes are convenience aliases and may not appear in Weave
+    # model names / usage payloads.
+    candidates = list(
+        dict.fromkeys(
+            [
+                model_name,
+                model_name.replace("together_ai/", "") if model_name else model_name,
+                model_name.replace("openai/", "") if model_name else model_name,
+            ]
+        )
+    )
 
-    if model_name not in MODEL_PRICES_DICT:
+    if any(name in MODEL_PRICES_DICT for name in candidates if name):
+        return
+
+    strict = os.getenv("HAL_STRICT_MODEL_PRICING", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    if strict:
         logger.error(
-            f"Model '{model_name}' not found in pricing dictionary. Please add pricing information to MODEL_PRICES_DICT in weave_utils.py. Exiting..."
+            "Model %r not found in pricing dictionary. Please add pricing information to "
+            "MODEL_PRICES_DICT in weave_utils.py (or unset HAL_STRICT_MODEL_PRICING).",
+            model_name,
         )
         sys.exit(1)
+
+    logger.warning(
+        "Model pricing for %r not found in MODEL_PRICES_DICT; continuing with $0 cost "
+        "(cost/budget tracking will be disabled for this model).",
+        model_name,
+    )
+
+    zero_price = {"prompt_tokens": 0.0, "completion_tokens": 0.0}
+    for name in candidates:
+        if name:
+            MODEL_PRICES_DICT.setdefault(name, zero_price)
 
 
 if __name__ == "__main__":
