@@ -442,9 +442,19 @@ class DockerRunner:
             # Run the script and capture output with timeout handling
             start_time = time.time()
 
-            # get env vars from .env file, then overlay current process env so
-            # inline prefix vars (e.g. WANDB_DISABLED=true hal-eval ...) flow through
-            env_vars = {**dotenv_values(".env"), **os.environ}
+            # get env vars from .env file, then overlay known relevant vars from
+            # the current process so inline prefix vars (e.g. WANDB_DISABLED=true)
+            # flow through without leaking unrelated host env into the container.
+            _PASS_THROUGH_VARS = {
+                "OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_API_BASE",
+                "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "TOGETHERAI_API_KEY",
+                "OPENROUTER_API_KEY", "SERPAPI_API_KEY", "SERPER_API_KEY",
+                "WANDB_API_KEY", "WANDB_DISABLED", "HF_TOKEN",
+            }
+            env_vars = dotenv_values(".env")
+            for key in _PASS_THROUGH_VARS:
+                if key in os.environ:
+                    env_vars[key] = os.environ[key]
             env_vars_str = " ".join([f"{k}={v}" for k, v in env_vars.items()])
             logger.info(f"Running script with env: {env_vars_str}")
 
