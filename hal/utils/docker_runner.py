@@ -2,6 +2,7 @@ import os
 import json
 import asyncio
 import shutil
+import shlex
 import uuid
 import tempfile
 import logging
@@ -455,7 +456,7 @@ class DockerRunner:
             for key in _PASS_THROUGH_VARS:
                 if key in os.environ:
                     env_vars[key] = os.environ[key]
-            env_vars_str = " ".join([f"{k}={v}" for k, v in env_vars.items()])
+            env_vars_str = " ".join([f"{k}={shlex.quote(str(v))}" for k, v in env_vars.items()])
             logger.info(f"Running script with env: {env_vars_str}")
 
             proc = await asyncio.create_subprocess_exec(
