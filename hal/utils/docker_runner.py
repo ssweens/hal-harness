@@ -311,11 +311,14 @@ class DockerRunner:
                 f.write(script)
 
             # create container from image and mount temp dir
+            # extra_hosts maps "localhost" inside the container to the Docker host
+            # gateway so agents can reach host-side services (e.g. corral on :9999)
             container = self.docker_client.containers.run(
                 image=DOCKER_IMAGE_NAME,
                 name=container_id,
                 detach=True,
                 command=["tail", "-f", "/dev/null"],  # Keep container running
+                extra_hosts={"localhost": "host-gateway"},
             )
 
             # Add container to active list
