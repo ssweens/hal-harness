@@ -442,8 +442,9 @@ class DockerRunner:
             # Run the script and capture output with timeout handling
             start_time = time.time()
 
-            # get env vars from .env file
-            env_vars = dotenv_values(".env")
+            # get env vars from .env file, then overlay current process env so
+            # inline prefix vars (e.g. WANDB_DISABLED=true hal-eval ...) flow through
+            env_vars = {**dotenv_values(".env"), **os.environ}
             env_vars_str = " ".join([f"{k}={v}" for k, v in env_vars.items()])
             logger.info(f"Running script with env: {env_vars_str}")
 
@@ -541,12 +542,19 @@ class DockerRunner:
 import os
 import json
 import importlib.util
-import weave
 import traceback
 import time
+from contextlib import contextmanager
+
+_weave_disabled = os.environ.get("WANDB_DISABLED", "").lower() in ("true", "1", "yes")
+
+if not _weave_disabled:
+    import weave
 
 def init_weave_with_retry(run_id, max_retries=5, base_delay=2.0):
     """Initialize weave with retry logic for transient connection errors."""
+    if _weave_disabled:
+        return None
     last_exception = None
     for attempt in range(max_retries):
         try:
@@ -570,6 +578,14 @@ def init_weave_with_retry(run_id, max_retries=5, base_delay=2.0):
 
     raise last_exception
 
+@contextmanager
+def weave_task_context(task_id):
+    if _weave_disabled:
+        yield
+    else:
+        with weave.attributes({{"weave_task_id": task_id}}):
+            yield
+
 try:
     # Initialize weave with retry logic
     init_weave_with_retry("{run_id}")
@@ -592,7 +608,7 @@ try:
     agent_fn = getattr(module, "{function_name}")
     
     # Run the agent function
-    with weave.attributes({{"weave_task_id": "{task_id}"}}):
+    with weave_task_context("{task_id}"):
         result = agent_fn(input_data, **agent_args)
     
     # Save output

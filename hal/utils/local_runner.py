@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import shutil
 import uuid
@@ -237,8 +238,9 @@ class LocalRunner:
             with open(script_path, "w") as f:
                 f.write(script)
 
-            # Build command
-            run_agent_cmd = ["python", str(script_path)]
+            # Build command — use the same Python that launched the harness so
+            # the agent subprocess inherits the active venv and its packages.
+            run_agent_cmd = [sys.executable, str(script_path)]
             if self.conda_env:
                 # Install weave in conda environment
                 logger.debug(f"Running agent for task {task_id}")
@@ -347,12 +349,19 @@ class LocalRunner:
 import os
 import json
 import importlib.util
-import weave
 import traceback
 import time
+from contextlib import contextmanager
+
+_weave_disabled = os.environ.get("WANDB_DISABLED", "").lower() in ("true", "1", "yes")
+
+if not _weave_disabled:
+    import weave
 
 def init_weave_with_retry(run_id, max_retries=5, base_delay=2.0):
     """Initialize weave with retry logic for transient connection errors."""
+    if _weave_disabled:
+        return None
     last_exception = None
     for attempt in range(max_retries):
         try:
@@ -376,6 +385,15 @@ def init_weave_with_retry(run_id, max_retries=5, base_delay=2.0):
 
     raise last_exception
 
+@contextmanager
+def weave_task_context(task_id):
+    """Wrap task in weave.attributes if weave is enabled, else no-op."""
+    if _weave_disabled:
+        yield
+    else:
+        with weave.attributes({{"weave_task_id": task_id}}):
+            yield
+
 try:
     # Initialize weave with retry logic
     init_weave_with_retry("{run_id}")
@@ -398,7 +416,7 @@ try:
     agent_fn = getattr(module, "{function_name}")
     
     # Run the agent function
-    with weave.attributes({{"weave_task_id": "{task_id}"}}):
+    with weave_task_context("{task_id}"):
         result = agent_fn(input_data, **agent_args)
     
     # Save output

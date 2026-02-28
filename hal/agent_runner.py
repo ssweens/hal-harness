@@ -218,7 +218,11 @@ class AgentRunner:
 
         # Initialize logging for main run
         logger.info("Initializing logging with W&B Weave...")
-        weave_client = weave.init(self.run_id)
+        if os.environ.get("WANDB_DISABLED", "").lower() in ("true", "1", "yes"):
+            logger.info("W&B disabled via WANDB_DISABLED; skipping Weave init.")
+            weave_client = None
+        else:
+            weave_client = weave.init(self.run_id)
 
         # Get dataset and filter for remaining tasks if continuing
         dataset = self.benchmark.get_dataset()
@@ -294,7 +298,7 @@ class AgentRunner:
                 )
 
         # delete previous calls from previous run if continuing for remaining tasks
-        if self.continue_run and not self.ignore_errors and dataset:
+        if self.continue_run and not self.ignore_errors and dataset and weave_client:
             logger.info("Cleaning up calls from previous run...")
             # Fetch all calls once instead of once per task (O(1) vs O(N) API calls)
             all_calls = weave_client.get_calls()
@@ -455,7 +459,8 @@ class AgentRunner:
         # Handle evaluation differently for prompt sensitivity mode
         if self.prompt_sensitivity:
             # stop weave logging before harness is run to avoid lm as judge to produce additional cost
-            weave.finish()
+            if weave_client:
+                weave.finish()
 
             # Evaluate each variation separately
             eval_results = {}
@@ -514,7 +519,8 @@ class AgentRunner:
                 # sys.exit(1)
 
             # stop weave logging before harness is run to avoid lm as judge to produce additional cost
-            weave.finish()
+            if weave_client:
+                weave.finish()
 
             eval_results = self.benchmark.evaluate_output(agent_output, self.run_id)
 
