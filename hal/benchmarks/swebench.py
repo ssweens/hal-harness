@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from typing import Dict, Any
 from .base_benchmark import BaseBenchmark
 from datasets import load_dataset
@@ -73,11 +74,7 @@ class SWEBenchBenchmark(BaseBenchmark):
                 f.write("\n")
 
         command = [
-            "conda",
-            "run",
-            "-n",
-            "swebench_hal",
-            "python",
+            sys.executable,
             "-m",
             "swebench.harness.run_evaluation",
             "--dataset_name",
@@ -91,32 +88,6 @@ class SWEBenchBenchmark(BaseBenchmark):
         ]
 
         try:
-            subprocess.run(
-                [
-                    "conda",
-                    "create",
-                    "-n",
-                    "swebench_hal",
-                    "python=3.11",
-                    "-y",
-                    "--force",
-                ],
-                check=True,
-            )
-            subprocess.run(
-                [
-                    "conda",
-                    "run",
-                    "-n",
-                    "swebench_hal",
-                    "pip",
-                    "install",
-                    "-e",
-                    "git+https://github.com/boyiwei/SWE-bench.git#egg=swebench",
-                ],
-                check=True,
-            )
-
             subprocess.run(command, check=True)
 
             # Load the evaluation results
