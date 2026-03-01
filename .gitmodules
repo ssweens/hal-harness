@@ -31,7 +31,8 @@
 	branch = open_deep_research
 [submodule "agents/SWE-agent-v1.0"]
 	path = agents/SWE-agent-v1.0
-	url = https://github.com/boyiwei/SWE-agent.git
+	url = https://github.com/SWE-agent/SWE-agent.git
+	branch = swe-agent-v1.0-hal
 [submodule "agents/Enigma"]
 	path = agents/Enigma
 	url = https://github.com/boyiwei/SWE-agent.git
