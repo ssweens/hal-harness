@@ -1,0 +1,4 @@
+# pi CLI is expected to be installed globally via npm:
+# npm install -g @mariozechner/pi-coding-agent
+#
+# No Python dependencies needed for this wrapper.
